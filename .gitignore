@@ -1,1 +1,6 @@
 git_ignore/
+__pycache__/
+*.pyc
+*.log
+ticket_counter.json
+users.json
