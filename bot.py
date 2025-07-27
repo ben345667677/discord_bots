@@ -1,36 +1,47 @@
 import discord
 from discord.ext import commands
 from config import token
-intents= discord.Intents.default()#אנפורמצית כניסה מהשרת
-intents.message_content = True        #הגדרת גישות
+
+intents = discord.Intents.default()
+intents.message_content = True
+intents.members = True  # חובה בשביל on_member_join
 
 bot = commands.Bot(command_prefix="!", intents=intents)
-#פקודה ליצירת כפתור  אימות----button_id="verifi_button"
-@bot.tree.command(name="verify_box", description="שלח הודעת אימות עם כפתור")
-async def verify_box(interaction: discord.Interaction):
-    if interaction.user.guild_permissions.administrator and interaction.channel.id == 1397573547395911731:
-        embed = discord.Embed(
+
+# ====== יצירת כפתור  vrrify אם רול =================================================================================================================================
+async def creait_button():
+    channel = bot.get_channel(1397573547395911731)
+    embed = discord.Embed(
         title="אימות המשתמש",
         description="לאימות המשתמש, לחץ על הכפתור למטה.",
-        color=0x00FF00  
-        )
-        view = discord.ui.View()
+        color=0x00FF00
+    )
 
-        view.add_item(discord.ui.Button(label="אמת אותי", style=discord.ButtonStyle.success, emoji="✅",custom_id="verify_button"))
+    button = discord.ui.Button(
+        label="אמת אותי",
+        style=discord.ButtonStyle.success,
+        emoji="✅",
+        custom_id="verify_button"
+    )
 
-        await interaction.response.send_message(embed=embed, view=view)
-    else :
-        if interaction.channel.id != 1397573547395911731:
-            await interaction.response.send_message(" !!חדר לא מתאים")
-        elif not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(" !!אין לך גישות")   
+    async def callback(interaction: discord.Interaction):
+        role_to_add = interaction.guild.get_role(1397574892509200527)   # הרול להוספה
+        role_to_remove = interaction.guild.get_role(1397576960468582521)  # הרול להסרה
+        if role_to_add:
+            await interaction.user.add_roles(role_to_add)
+        if role_to_remove and role_to_remove in interaction.user.roles:
+            await interaction.user.remove_roles(role_to_remove)
+        await interaction.response.send_message("האימות הצליח! רול עודכן.", ephemeral=True)
 
-#--------------------------------------------------------------------------פונקציות on ready -------------------------------------------------------
-# פונקציית בדיקת כפתור verify  ----------------------------------------------------------------------------------------------------------------------             
-@bot.event
+    button.callback = callback
+    view = discord.ui.View()
+    view.add_item(button)
+    await channel.send(embed=embed, view=view)
+
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+# ====== בדיקת קיום כפתור אימות ================================================================================================================================
 async def botton_verify_check():
-    channel = bot.get_channel(1397573547395911731)  # ודא שזה ה-ID הנכון
-
+    channel = bot.get_channel(1397573547395911731)
     button_exists = False
     async for message in channel.history(limit=10):
         for row in message.components:
@@ -38,23 +49,49 @@ async def botton_verify_check():
                 if c.custom_id == "verify_button":
                     button_exists = True
                     break
-
     if not button_exists:
-        embed = discord.Embed(
-            title="אימות המשתמש",
-            description="לאימות המשתמש, לחץ על הכפתור למטה.",
-            color=0x00FF00
-        )
-        view = discord.ui.View()
-        view.add_item(discord.ui.Button(label="אמת אותי", style=discord.ButtonStyle.success, emoji="✅", custom_id="verify_button"))
-        await channel.send(embed=embed, view=view)
+        await creait_button()
+#========================================================================================================================================================================        
+
+# ====== פקודת שליחת כפתור =====================================================================================================================================================
+@bot.tree.command(name="verify_box", description="שלח הודעת אימות עם כפתור")
+async def verify_box(interaction: discord.Interaction):
+    if interaction.user.guild_permissions.administrator and interaction.channel.id == 1397573547395911731:
+        await creait_button()
+        await interaction.response.send_message("הודעת אימות נשלחה!", ephemeral=True)
+    else:
+        await interaction.response.send_message("!!אין לך הרשאה או חדר לא מתאים", ephemeral=True)
+
+# ====== on_ready =================================================================================================================================================================
 @bot.event
 async def on_ready():
-    print("הבוט עלה בהצלחה ")  
-    botton_verify_check                          
-#--------------------------------------------------------------------------------------------------------------------------------------------------------------
-@bot ev bot.event                  
-async def on_message(message):
-    if message.content == "!hello":
-        await message.channel.send("love you")
-bot.run(token)          
+    print("הבוט עלה בהצלחה")
+    await botton_verify_check()
+    await bot.tree.sync()  
+
+# ====== הודעת ברוך הבא =======================================================================================================================================================
+async def welcam(member):
+    channel = bot.get_channel(1397573547395911731)  # ID של חדר ברוכים
+    if channel:
+        embed = discord.Embed(
+            title="🎉 ברוך הבא!",
+            description=f"**{member.name}** הצטרף אלינו לשרת!",
+            color=0x00ff00
+        )
+        embed.set_footer(text="אנחנו שמחים לראות אותך כאן!")
+        await channel.send(embed=embed)
+
+# ====== הוספת רול למשתמש שנכנס ============================================================================================================================================================
+async def verify_role(member):
+    role = member.guild.get_role(1397576960468582521)
+    if role:
+        await member.add_roles(role)
+#=============================================================================================================================================================================================        
+
+
+@bot.event
+async def on_member_join(member):
+    await welcam(member)
+    await verify_role(member)
+
+bot.run(token)
